@@ -58,6 +58,7 @@ SET (YUNO_HDRS
 ADD_EXECUTABLE(dba_postgres ${YUNO_SRCS} ${YUNO_HDRS})
 
 TARGET_LINK_LIBRARIES(dba_postgres
+    /yuneta/development/output/lib/libyuneta-postgres.a
     /yuneta/development/output/lib/libyuneta-tls.a
     /yuneta/development/output/lib/libyuneta-core.a
     /yuneta/development/output/lib/libginsfsm.a
@@ -72,6 +73,8 @@ TARGET_LINK_LIBRARIES(dba_postgres
     /yuneta/development/output/lib/libcurl.a
     /yuneta/development/output/lib/libssl.a
     /yuneta/development/output/lib/libcrypto.a
+
+    pq          # postgres
 
     pthread dl  # used by libuv
     lzma        # used by libunwind

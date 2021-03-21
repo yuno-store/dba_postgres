@@ -88,17 +88,6 @@ PRIVATE char variable_config[]= "\
             },                                                      \n\
             'zchilds': [                                            \n\
             ]                                                       \n\
-        },                                                          \n\
-        {                                                           \n\
-            'name': 'authz',                                        \n\
-            'gclass': 'Authz',                                      \n\
-            'default_service': false,                               \n\
-            'autostart': true,                                      \n\
-            'autoplay': true,                                       \n\
-            'kw': {                                                 \n\
-            },                                                      \n\
-            'zchilds': [                                            \n\
-            ]                                                       \n\
         }                                                           \n\
     ]                                                               \n\
 }                                                                   \n\
