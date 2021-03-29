@@ -49,6 +49,8 @@ SDATA_END()
  *---------------------------------------------*/
 PRIVATE sdata_desc_t tattr_desc[] = {
 /*-ATTR-type------------name------------flag--------------------default-----description--*/
+SDATADF (ASN_OCTET_STR, "url",          SDF_PERSIST|SDF_WR,     0,          "Url",          30,     "Connection url."),
+SDATADF (ASN_BOOLEAN,   "opened",       SDF_RD,                 0,          "Opened",       10,     "Channel opened."),
 SDATA (ASN_COUNTER64,   "txMsgs",       SDF_RD|SDF_RSTATS,      0,          "Messages transmitted"),
 SDATA (ASN_COUNTER64,   "rxMsgs",       SDF_RD|SDF_RSTATS,      0,          "Messages receiveds"),
 
@@ -284,6 +286,7 @@ PRIVATE int process_msg(
     hgobj src
 )
 {
+    return -1;
 }
 
 
@@ -445,7 +448,7 @@ PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
 PRIVATE const EVENT input_events[] = {
     // top input
     {"EV_ON_MESSAGE",       0,  0,  0},
-    {"EV_LIST_TRACKS",      EVF_PUBLIC_EVENT,  0,  0},
+//     {"EV_LIST_TRACKS",      EVF_PUBLIC_EVENT,  0,  0},
 
     {"EV_ON_OPEN",          0,  0,  0},
     {"EV_ON_CLOSE",         0,  0,  0},
