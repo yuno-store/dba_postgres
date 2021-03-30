@@ -280,12 +280,99 @@ PRIVATE int send_ack(
 /***************************************************************************
  *
  ***************************************************************************/
+// PRIVATE json_t *record2insertsql(
+//     hgobj gobj,
+//     const char *table,
+//     json_t *msg // owned
+// )
+// {
+//     PRIVATE_DATA *priv = gobj_priv_data(gobj);
+//
+//     GBUFFER *gbuf = gbuf_create(1*1024, 1*1024, 0, 0);
+//
+//     gbuf_printf(gbuf, "INSERT INTO %s (", table);
+//
+//     int idx = 0;
+//     const char *key; json_t *value;
+//     json_object_foreach(msg, key, value) {
+//         if(idx > 0) {
+//             gbuf_append_char(gbuf, ',');
+//         }
+//         if(strcmp(key, "__md_tranger__")==0) {
+//             gbuf_printf(gbuf, "%s", "rowid");
+//         } else {
+//             gbuf_printf(gbuf, "%s", key);
+//         }
+//         idx++;
+//     }
+//
+//     gbuf_printf(gbuf, ") VALUES (");
+//
+//     idx = 0;
+//     json_object_foreach(msg, key, value) {
+//         if(idx > 0) {
+//             gbuf_append_char(gbuf, ',');
+//         }
+//
+//         if(strcmp(key, "__md_tranger__")==0) {
+//             gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, kw_get_int(value, "__rowid__", 0, KW_REQUIRED));
+//         } else {
+//             char *s = json2uglystr(value);
+//             // TODO IMPORTANTE char *ss = PQescapeLiteral(priv->conn, const char *str, size_t length);
+//
+//             change_char(s, '"', '\'');
+//
+//             if(strcmp(key, "tm")==0) {
+//                 char temp[256];
+//                 snprintf(temp, sizeof(temp),
+//                     "('epoch'::timestamptz + %s * '1 second'::interval)", s
+//                 );
+//                 gbmem_free(s);
+//
+//                 s = gbmem_strdup(temp);
+//             }
+//
+//             gbuf_append_string(gbuf, s);
+//             gbmem_free(s);
+//         }
+//
+//         idx++;
+//     }
+//
+//     gbuf_printf(gbuf, ");");
+//     char *p = gbuf_cur_rd_pointer(gbuf);
+//     json_t *jn_query = json_string(p);
+//     gbuf_decref(gbuf);
+//
+//     JSON_DECREF(msg);
+//     return jn_query;
+// }
+
+/***************************************************************************
+ *
+ ***************************************************************************/
 PRIVATE int process_msg(
     hgobj gobj,
     json_t *kw,  // NOT owned
     hgobj src
 )
 {
+//     json_t *query;
+//     query = json_pack("{s:o}",
+//         "query",
+//         record2insertsql(gobj, "tracks_geodb2", msg)
+//     );
+//     print_json(query); // TODO TEST
+//
+//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+//
+//     query = json_pack("{s:s}",
+//         "query", "SELECT * from tracks_geodb2;"
+//     );
+//
+//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+
+
     return -1;
 }
 

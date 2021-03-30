@@ -9,6 +9,7 @@
  *          Copyright (c) 2021 by Niyamaka.
  *          All Rights Reserved.
  ****************************************************************************/
+#include <yuneta_postgres.h>
 #include <yuneta_tls.h>
 #include <yuneta.h>
 #include "c_dba_postgres.h"
@@ -98,6 +99,11 @@ PRIVATE char variable_config[]= "\
  ***************************************************************************/
 static void register_yuno_and_more(void)
 {
+    /*-----------------------------*
+     *  Register yuneta-postgres
+     *-----------------------------*/
+    yuneta_register_c_postgres();
+
     /*------------------------*
      *  Register yuneta-tls
      *------------------------*/
