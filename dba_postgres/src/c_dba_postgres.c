@@ -277,6 +277,32 @@ PRIVATE int send_ack(
     return gobj_send_event(priv->gobj_input_side, "EV_SEND_MESSAGE", kw_send, gobj);
 }
 
+        //gobj_stop_tree(src);
+        //gobj_send_event(src, "EV_DROP", 0, gobj);
+
+//         json_t *query;
+//         query = json_pack("{s:s}",
+//             "query",
+//             "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
+//                 "rowid       bigint PRIMARY KEY,"
+//                 "id          text,"
+//                 "name        text,"
+//                 "event       text,"
+//                 "tm          timestamp,"
+//                 "priority    bigint,"
+//                 "gps_fixed   boolean,"
+//                 "accuracy    bigint,"
+//                 "speed       bigint,"
+//                 "battery     bigint,"
+//                 "altitude    bigint,"
+//                 "heading     bigint,"
+//                 "longitude   real,"
+//                 "latitude    real"
+//             ");"
+//         );
+//         gobj_send_event(src, "EV_SEND_QUERY", query, gobj);
+
+
 /***************************************************************************
  *
  ***************************************************************************/
@@ -357,7 +383,8 @@ PRIVATE int process_msg(
     hgobj src
 )
 {
-//     json_t *query;
+print_json(kw); // TODO TEST
+    //     json_t *query;
 //     query = json_pack("{s:o}",
 //         "query",
 //         record2insertsql(gobj, "tracks_geodb2", msg)
@@ -371,6 +398,7 @@ PRIVATE int process_msg(
 //     );
 //
 //     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+
 
 
     return -1;
