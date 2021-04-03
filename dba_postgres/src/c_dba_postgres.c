@@ -266,7 +266,7 @@ PRIVATE int mt_play(hgobj gobj)
     gobj_start_tree(priv->gobj_input_side);
 
     priv->gobj_postgres = gobj_find_service("__postgres__", TRUE);
-    gobj_subscribe_event(priv->gobj_postgres, 0, 0, gobj);
+    // Don't subscribe, will do the tasks
     gobj_start_tree(priv->gobj_postgres);
 
     /*
@@ -290,7 +290,6 @@ PRIVATE int mt_pause(hgobj gobj)
     gobj_unsubscribe_event(priv->gobj_input_side, 0, 0, gobj);
     EXEC_AND_RESET(gobj_stop_tree, priv->gobj_input_side);
 
-    gobj_unsubscribe_event(priv->gobj_postgres, 0, 0, gobj);
     EXEC_AND_RESET(gobj_stop_tree, priv->gobj_postgres);
 
     clear_timeout(priv->timer);
@@ -340,7 +339,33 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    json_t *kw_ = data;
+
+        //gobj_stop_tree(src);
+        //gobj_send_event(src, "EV_DROP", 0, gobj);
+
+    json_t *query;
+    query = json_pack("{s:s}",
+        "query",
+        "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
+            "rowid       bigint PRIMARY KEY,"
+            "id          text,"
+            "name        text,"
+            "event       text,"
+            "tm          timestamp,"
+            "priority    bigint,"
+            "gps_fixed   boolean,"
+            "accuracy    bigint,"
+            "speed       bigint,"
+            "battery     bigint,"
+            "altitude    bigint,"
+            "heading     bigint,"
+            "longitude   real,"
+            "latitude    real"
+        ");"
+    );
+    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     return 0;
 }
@@ -350,7 +375,7 @@ PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    json_t *kw_ = data;
 
     return 0;
 }
@@ -360,7 +385,7 @@ PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *action_add_row(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    json_t *kw_ = data;
 
     return 0;
 }
@@ -419,32 +444,6 @@ PRIVATE int send_ack(
 
     return gobj_send_event(priv->gobj_input_side, "EV_SEND_MESSAGE", kw_send, gobj);
 }
-
-        //gobj_stop_tree(src);
-        //gobj_send_event(src, "EV_DROP", 0, gobj);
-
-//         json_t *query;
-//         query = json_pack("{s:s}",
-//             "query",
-//             "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
-//                 "rowid       bigint PRIMARY KEY,"
-//                 "id          text,"
-//                 "name        text,"
-//                 "event       text,"
-//                 "tm          timestamp,"
-//                 "priority    bigint,"
-//                 "gps_fixed   boolean,"
-//                 "accuracy    bigint,"
-//                 "speed       bigint,"
-//                 "battery     bigint,"
-//                 "altitude    bigint,"
-//                 "heading     bigint,"
-//                 "longitude   real,"
-//                 "latitude    real"
-//             ");"
-//         );
-//         gobj_send_event(src, "EV_SEND_QUERY", query, gobj);
-
 
 /***************************************************************************
  *
@@ -551,11 +550,11 @@ PRIVATE int process_msg(
     /*-----------------------------*
      *      Check if exists task
      *-----------------------------*/
-    if(gobj_find_gobj(task_name)) {
-        log_info(0,
+    if(gobj_find_unique_gobj(task_name, FALSE)) {
+        log_error(0,
             "gobj",         "%s", gobj_full_name(gobj),
             "function",     "%s", __FUNCTION__,
-            "msgset",       "%s", MSGSET_INFO,
+            "msgset",       "%s", MSGSET_INTERNAL_ERROR,
             "msg",          "%s", "task already active",
             "task_name",    "%s", task_name,
             NULL
@@ -569,13 +568,13 @@ PRIVATE int process_msg(
     json_t *kw_task = json_pack("{s:I, s:s, s:s, s:s, s:s, s:I, s:I}",
         "tranger", (json_int_t)(size_t)priv->tranger_tasks_,
         "task_name", task_name,
-        "pkey", "",
+        "pkey", "id",
         "tkey", "",
-        "system_flag", "sf_rowid_key",
+        "system_flag", "sf_string_key",
         "gobj_jobs", (json_int_t)(size_t)gobj,
         "gobj_results", (json_int_t)(size_t)priv->gobj_postgres
     );
-    hgobj gobj_task = gobj_create_volatil(task_name, GCLASS_TASK, kw_task, gobj);
+    hgobj gobj_task = gobj_create_unique(task_name, GCLASS_TASK, kw_task, gobj);
     /*
      *  HACK pipe inheritance
      */
@@ -597,10 +596,12 @@ PRIVATE int process_msg(
      */
     gobj_send_event(
         gobj_task,
-        "ADD_JOB",
-        json_pack("{s:s, s:s}"
+        "EV_ADD_JOB",
+        json_pack("{s:s, s:s, s:s, s:O}",
+            "id", "create_table_if_not_exists",
             "action", "action_create_table_if_not_exists",
-            "result", "result_create_table_if_not_exists"
+            "result", "result_create_table_if_not_exists",
+            "kw", kw
         ),
         gobj
     );
@@ -610,8 +611,9 @@ PRIVATE int process_msg(
      */
     gobj_send_event(
         gobj_task,
-        "ADD_JOB",
-        json_pack("{s:s, s:s}"
+        "EV_ADD_JOB",
+        json_pack("{s:s, s:s, s:s}",
+            "id", "add_row",
             "action", "action_add_row",
             "result", "result_add_row"
         ),
@@ -623,8 +625,9 @@ PRIVATE int process_msg(
      */
     gobj_send_event(
         gobj_task,
-        "ADD_JOB",
-        json_pack("{s:s, s:s}"
+        "EV_ADD_JOB",
+        json_pack("{s:s, s:s, s:s}",
+            "id", "send_ack",
             "action", "action_send_ack",
             "result", "result_send_ack"
         ),
