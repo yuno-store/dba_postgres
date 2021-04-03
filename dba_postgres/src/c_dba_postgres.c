@@ -7,6 +7,8 @@
  *          Copyright (c) 2021 by Niyamaka.
  *          All Rights Reserved.
  ***********************************************************************/
+#include <grp.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 #include "c_dba_postgres.h"
@@ -49,8 +51,12 @@ SDATA_END()
  *---------------------------------------------*/
 PRIVATE sdata_desc_t tattr_desc[] = {
 /*-ATTR-type------------name------------flag--------------------default-----description--*/
-SDATADF (ASN_OCTET_STR, "url",          SDF_PERSIST|SDF_WR,     0,          "Url",          30,     "Connection url."),
-SDATADF (ASN_BOOLEAN,   "opened",       SDF_RD,                 0,          "Opened",       10,     "Channel opened."),
+SDATA (ASN_OCTET_STR,   "__username__", SDF_RD,                 "",         "Username"),
+SDATA (ASN_OCTET_STR,   "filename_mask",SDF_RD|SDF_REQUIRED,    "%Y-%m",        "System organization of tables (file name format, see strftime())"),
+SDATA (ASN_BOOLEAN,     "master",       SDF_RD,                 TRUE,       "the master is the only that can write"),
+SDATA (ASN_INTEGER,     "xpermission",  SDF_RD,                 02770,      "Use in creation, default 02770"),
+SDATA (ASN_INTEGER,     "rpermission",  SDF_RD,                 0660,       "Use in creation, default 0660"),
+SDATA (ASN_INTEGER,     "exit_on_error",0,                      LOG_OPT_EXIT_ZERO,"exit on error"),
 SDATA (ASN_COUNTER64,   "txMsgs",       SDF_RD|SDF_RSTATS,      0,          "Messages transmitted"),
 SDATA (ASN_COUNTER64,   "rxMsgs",       SDF_RD|SDF_RSTATS,      0,          "Messages receiveds"),
 
@@ -85,8 +91,11 @@ typedef struct _PRIVATE_DATA {
     hgobj timer;
 
     hgobj gobj_input_side;
-
     hgobj gobj_postgres;
+
+    hgobj gobj_tranger_tasks;
+    json_t *tranger_tasks_;
+    int32_t exit_on_error;
 
     uint64_t *ptxMsgs;
     uint64_t *prxMsgs;
@@ -111,15 +120,89 @@ PRIVATE void mt_create(hgobj gobj)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-    priv->timer = gobj_create(gobj_name(gobj), GCLASS_TIMER, 0, gobj);
-    priv->ptxMsgs = gobj_danger_attr_ptr(gobj, "txMsgs");
-    priv->prxMsgs = gobj_danger_attr_ptr(gobj, "rxMsgs");
-
     /*
      *  Do copy of heavy used parameters, for quick access.
      *  HACK The writable attributes must be repeated in mt_writing method.
      */
     SET_PRIV(timeout,               gobj_read_int32_attr)
+    SET_PRIV(exit_on_error,             gobj_read_int32_attr)
+
+    priv->timer = gobj_create(gobj_name(gobj), GCLASS_TIMER, 0, gobj);
+    priv->ptxMsgs = gobj_danger_attr_ptr(gobj, "txMsgs");
+    priv->prxMsgs = gobj_danger_attr_ptr(gobj, "rxMsgs");
+
+    /*----------------------------------------*
+     *  Check AUTHZS
+     *----------------------------------------*/
+    BOOL is_yuneta = FALSE;
+    struct passwd *pw = getpwuid(getuid());
+    if(strcmp(pw->pw_name, "yuneta")==0) {
+        gobj_write_str_attr(gobj, "__username__", "yuneta");
+        is_yuneta = TRUE;
+    } else {
+        static gid_t groups[30]; // HACK to use outside
+        int ngroups = sizeof(groups)/sizeof(groups[0]);
+
+        getgrouplist(pw->pw_name, 0, groups, &ngroups);
+        for(int i=0; i<ngroups; i++) {
+            struct group *gr = getgrgid(groups[i]);
+            if(strcmp(gr->gr_name, "yuneta")==0) {
+                gobj_write_str_attr(gobj, "__username__", "yuneta");
+                is_yuneta = TRUE;
+                break;
+            }
+        }
+    }
+    if(!is_yuneta) {
+        trace_msg("User or group 'yuneta' is needed to run %s", gobj_yuno_role());
+        printf("User or group 'yuneta' is needed to run %s\n", gobj_yuno_role());
+        exit(0);
+    }
+
+    /*----------------------------*
+     *  Create Tasks Timeranger
+     *----------------------------*/
+    const char *filename_mask = gobj_read_str_attr(gobj, "filename_mask");
+    BOOL master = gobj_read_bool_attr(gobj, "master");
+    int exit_on_error = gobj_read_int32_attr(gobj, "exit_on_error");
+    int xpermission = gobj_read_int32_attr(gobj, "xpermission");
+    int rpermission = gobj_read_int32_attr(gobj, "rpermission");
+
+    char path[PATH_MAX];
+    yuneta_realm_store_dir(
+        path,
+        sizeof(path),
+        gobj_yuno_role(),
+        gobj_yuno_realm_owner(),
+        gobj_yuno_realm_id(),
+        "tasks",
+        TRUE
+    );
+
+    json_t *kw_tranger = json_pack("{s:s, s:s, s:b, s:i, s:i, s:i}",
+        "path", path,
+        "filename_mask", filename_mask,
+        "master", master,
+        "on_critical_error", exit_on_error,
+        "xpermission", xpermission,
+        "rpermission", rpermission
+    );
+    priv->gobj_tranger_tasks = gobj_create_service(
+        "tranger_tasks",
+        GCLASS_TRANGER,
+        kw_tranger,
+        gobj
+    );
+    priv->tranger_tasks_ = gobj_read_pointer_attr(priv->gobj_tranger_tasks, "tranger");
+    if(!priv->tranger_tasks_) {
+        log_critical(priv->exit_on_error,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+            "msg",          "%s", "tranger NULL",
+            NULL
+        );
+    }
 }
 
 /***************************************************************************
@@ -253,6 +336,66 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 
 
 /***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *action_add_row(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *result_add_row(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *action_send_ack(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE void *result_send_ack(hgobj gobj, void *data)
+{
+    hgobj gobj_task = data;
+
+    return 0;
+}
+
+/***************************************************************************
  *  Send ack to __input_side__
  ***************************************************************************/
 PRIVATE int send_ack(
@@ -383,7 +526,117 @@ PRIVATE int process_msg(
     hgobj src
 )
 {
-print_json(kw); // TODO TEST
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    /*-----------------------------*
+     *      Build task name
+     *-----------------------------*/
+    const char *id = kw_get_str(kw, "id", "", KW_REQUIRED);
+    json_int_t __msg_key__ = kw_get_int(kw, "__md_trq__`__msg_key__", 0, KW_REQUIRED);
+    if(!__msg_key__) {
+        log_error(0,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_INTERNAL_ERROR,
+            "msg",          "%s", "Not __msg_key__, free queue's msg",
+            "src",          "%s", gobj_full_name(src),
+            NULL
+        );
+        return 0; // free the queue's msg
+    }
+
+    char task_name[NAME_MAX];
+    snprintf(task_name, sizeof(task_name), "task-%s-%"JSON_INTEGER_FORMAT, id, __msg_key__);
+
+    /*-----------------------------*
+     *      Check if exists task
+     *-----------------------------*/
+    if(gobj_find_gobj(task_name)) {
+        log_info(0,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_INFO,
+            "msg",          "%s", "task already active",
+            "task_name",    "%s", task_name,
+            NULL
+        );
+        return -1; // Don't send ack
+    }
+
+    /*-----------------------------*
+     *      Create the task
+     *-----------------------------*/
+    json_t *kw_task = json_pack("{s:I, s:s, s:s, s:s, s:s, s:I, s:I}",
+        "tranger", (json_int_t)(size_t)priv->tranger_tasks_,
+        "task_name", task_name,
+        "pkey", "",
+        "tkey", "",
+        "system_flag", "sf_rowid_key",
+        "gobj_jobs", (json_int_t)(size_t)gobj,
+        "gobj_results", (json_int_t)(size_t)priv->gobj_postgres
+    );
+    hgobj gobj_task = gobj_create_volatil(task_name, GCLASS_TASK, kw_task, gobj);
+    /*
+     *  HACK pipe inheritance
+     */
+    gobj_set_bottom_gobj(gobj_task, priv->gobj_tranger_tasks);
+
+    /*-----------------------*
+     *      Start task
+     *-----------------------*/
+    if(gobj_start(gobj_task)<0) {
+        gobj_destroy(gobj_task);
+        return -1; // Don't send ack
+    }
+
+    /*---------------------------------*
+     *      Create the task's jobs
+     *---------------------------------*/
+    /*
+     *  Create the table if not exists
+     */
+    gobj_send_event(
+        gobj_task,
+        "ADD_JOB",
+        json_pack("{s:s, s:s}"
+            "action", "action_create_table_if_not_exists",
+            "result", "result_create_table_if_not_exists"
+        ),
+        gobj
+    );
+
+    /*
+     *  Add row
+     */
+    gobj_send_event(
+        gobj_task,
+        "ADD_JOB",
+        json_pack("{s:s, s:s}"
+            "action", "action_add_row",
+            "result", "result_add_row"
+        ),
+        gobj
+    );
+
+    /*
+     *  Send ack
+     */
+    gobj_send_event(
+        gobj_task,
+        "ADD_JOB",
+        json_pack("{s:s, s:s}"
+            "action", "action_send_ack",
+            "result", "result_send_ack"
+        ),
+        gobj
+    );
+
+    /*-----------------------*
+     *      Play task
+     *-----------------------*/
+    gobj_play(gobj_task);
+
+
     //     json_t *query;
 //     query = json_pack("{s:o}",
 //         "query",
@@ -401,7 +654,7 @@ print_json(kw); // TODO TEST
 
 
 
-    return -1;
+    return -1; // Don't send ack
 }
 
 
@@ -609,6 +862,12 @@ PRIVATE FSM fsm = {
  *              Local methods table
  *---------------------------------------------*/
 PRIVATE LMETHOD lmt[] = {
+    {"action_add_row",                      action_add_row, 0},
+    {"result_add_row",                      result_add_row, 0},
+    {"action_send_ack",                     action_send_ack, 0},
+    {"result_send_ack",                     result_send_ack, 0},
+    {"action_create_table_if_not_exists",   action_create_table_if_not_exists, 0},
+    {"result_create_table_if_not_exists",   result_create_table_if_not_exists, 0},
     {0, 0, 0}
 };
 
