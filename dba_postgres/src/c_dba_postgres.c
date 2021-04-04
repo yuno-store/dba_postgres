@@ -340,7 +340,7 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    json_t *kw_ = data;
+    json_t *kw_ = data; // not owned
 
         //gobj_stop_tree(src);
         //gobj_send_event(src, "EV_DROP", 0, gobj);
@@ -367,7 +367,7 @@ PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
     );
     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -375,9 +375,9 @@ PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
 {
-    json_t *kw_ = data;
+    json_t *kw_ = data; // not owned
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -385,9 +385,9 @@ PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *action_add_row(hgobj gobj, void *data)
 {
-    json_t *kw_ = data;
+    json_t *kw_ = data; // not owned
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -395,9 +395,9 @@ PRIVATE void *action_add_row(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *result_add_row(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    json_t *kw_ = data; // not owned
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -405,9 +405,9 @@ PRIVATE void *result_add_row(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *action_send_ack(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    json_t *kw_ = data; // not owned
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -415,9 +415,9 @@ PRIVATE void *action_send_ack(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *result_send_ack(hgobj gobj, void *data)
 {
-    hgobj gobj_task = data;
+    json_t *kw_ = data; // not owned
 
-    return 0;
+    return (void *)0; // continue
 }
 
 /***************************************************************************
@@ -575,10 +575,7 @@ PRIVATE int process_msg(
         "gobj_results", (json_int_t)(size_t)priv->gobj_postgres
     );
     hgobj gobj_task = gobj_create_unique(task_name, GCLASS_TASK, kw_task, gobj);
-    /*
-     *  HACK pipe inheritance
-     */
-    gobj_set_bottom_gobj(gobj_task, priv->gobj_tranger_tasks);
+    gobj_subscribe_event(gobj_task, "EV_END_TASK", 0, gobj);
 
     /*-----------------------*
      *      Start task
@@ -599,8 +596,8 @@ PRIVATE int process_msg(
         "EV_ADD_JOB",
         json_pack("{s:s, s:s, s:s, s:O}",
             "id", "create_table_if_not_exists",
-            "action", "action_create_table_if_not_exists",
-            "result", "result_create_table_if_not_exists",
+            "exec_action", "action_create_table_if_not_exists",
+            "exec_result", "result_create_table_if_not_exists",
             "kw", kw
         ),
         gobj
@@ -614,8 +611,8 @@ PRIVATE int process_msg(
         "EV_ADD_JOB",
         json_pack("{s:s, s:s, s:s}",
             "id", "add_row",
-            "action", "action_add_row",
-            "result", "result_add_row"
+            "exec_action", "action_add_row",
+            "exec_result", "result_add_row"
         ),
         gobj
     );
@@ -628,8 +625,8 @@ PRIVATE int process_msg(
         "EV_ADD_JOB",
         json_pack("{s:s, s:s, s:s}",
             "id", "send_ack",
-            "action", "action_send_ack",
-            "result", "result_send_ack"
+            "exec_action", "action_send_ack",
+            "exec_result", "result_send_ack"
         ),
         gobj
     );
@@ -790,6 +787,21 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
 /***************************************************************************
  *
  ***************************************************************************/
+PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
+{
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    gobj_pause(src);
+    gobj_stop(src);
+    gobj_destroy(src);
+
+    KW_DECREF(kw);
+    return 0;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
 PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
@@ -819,6 +831,7 @@ PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
 PRIVATE const EVENT input_events[] = {
     // top input
     {"EV_ON_MESSAGE",       0,  0,  0},
+    {"EV_END_TASK",         0,  0,  0},
 //     {"EV_LIST_TRACKS",      EVF_PUBLIC_EVENT,  0,  0},
 
     {"EV_ON_OPEN",          0,  0,  0},
@@ -841,6 +854,7 @@ PRIVATE EV_ACTION ST_IDLE[] = {
     {"EV_ON_MESSAGE",       ac_on_message,      0},
     {"EV_ON_OPEN",          ac_on_open,         0},
     {"EV_ON_CLOSE",         ac_on_close,        0},
+    {"EV_END_TASK",         ac_end_task,        0},
     {"EV_TIMEOUT",          ac_timeout,         0},
     {"EV_STOPPED",          0,                  0},
     {0,0,0}
