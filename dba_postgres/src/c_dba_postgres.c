@@ -24,6 +24,17 @@
 /***************************************************************************
  *              Prototypes
  ***************************************************************************/
+PRIVATE json_t *record2insertsql(
+    hgobj gobj,
+    const char *table,
+    json_t *msg // owned
+);
+
+PRIVATE int send_ack(
+    hgobj gobj,
+    json_t *kw_ack,  // owned
+    json_t *__temp__ // channel info
+);
 
 /***************************************************************************
  *          Data: config, public data, private data
@@ -385,7 +396,24 @@ PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *action_add_row(hgobj gobj, void *data)
 {
-    json_t *kw_ = data; // not owned
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    json_t *jn_msg = data; // not owned
+
+print_json(jn_msg);
+
+    json_t *query;
+    query = json_pack("{s:o}",
+        "query",
+        record2insertsql(gobj, "tracks_geodb2", jn_msg)
+    );
+    print_json(query); // TODO TEST
+
+    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+
+//     query = json_pack("{s:s}",
+//         "query", "SELECT * from tracks_geodb2;"
+//     );
+//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     return (void *)0; // continue
 }
@@ -395,7 +423,25 @@ PRIVATE void *action_add_row(hgobj gobj, void *data)
  ***************************************************************************/
 PRIVATE void *result_add_row(hgobj gobj, void *data)
 {
-    json_t *kw_ = data; // not owned
+    json_t *jn_msg = data; // not owned
+
+    json_t *__temp__ = kw_get_dict_value(jn_msg, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
+
+    json_t *kw_ack = trq_answer(
+        jn_msg,  // not owned
+        0
+    );
+
+    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+        trace_msg("  -> BACK ack rowid %"JSON_INTEGER_FORMAT"",
+            kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED)
+        );
+    }
+    send_ack(
+        gobj,
+        kw_ack, // owned
+        __temp__ // Set the channel
+    );
 
     return (void *)0; // continue
 }
@@ -403,9 +449,10 @@ PRIVATE void *result_add_row(hgobj gobj, void *data)
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *action_send_ack(hgobj gobj, void *data)
+PRIVATE void *action_list_rows(hgobj gobj, void *data)
 {
-    json_t *kw_ = data; // not owned
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    json_t *jn_msg = data; // not owned
 
     return (void *)0; // continue
 }
@@ -413,9 +460,9 @@ PRIVATE void *action_send_ack(hgobj gobj, void *data)
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *result_send_ack(hgobj gobj, void *data)
+PRIVATE void *result_list_rows(hgobj gobj, void *data)
 {
-    json_t *kw_ = data; // not owned
+    json_t *jn_msg = data; // not owned
 
     return (void *)0; // continue
 }
@@ -448,73 +495,73 @@ PRIVATE int send_ack(
 /***************************************************************************
  *
  ***************************************************************************/
-// PRIVATE json_t *record2insertsql(
-//     hgobj gobj,
-//     const char *table,
-//     json_t *msg // owned
-// )
-// {
-//     PRIVATE_DATA *priv = gobj_priv_data(gobj);
-//
-//     GBUFFER *gbuf = gbuf_create(1*1024, 1*1024, 0, 0);
-//
-//     gbuf_printf(gbuf, "INSERT INTO %s (", table);
-//
-//     int idx = 0;
-//     const char *key; json_t *value;
-//     json_object_foreach(msg, key, value) {
-//         if(idx > 0) {
-//             gbuf_append_char(gbuf, ',');
-//         }
-//         if(strcmp(key, "__md_tranger__")==0) {
-//             gbuf_printf(gbuf, "%s", "rowid");
-//         } else {
-//             gbuf_printf(gbuf, "%s", key);
-//         }
-//         idx++;
-//     }
-//
-//     gbuf_printf(gbuf, ") VALUES (");
-//
-//     idx = 0;
-//     json_object_foreach(msg, key, value) {
-//         if(idx > 0) {
-//             gbuf_append_char(gbuf, ',');
-//         }
-//
-//         if(strcmp(key, "__md_tranger__")==0) {
-//             gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, kw_get_int(value, "__rowid__", 0, KW_REQUIRED));
-//         } else {
-//             char *s = json2uglystr(value);
-//             // TODO IMPORTANTE char *ss = PQescapeLiteral(priv->conn, const char *str, size_t length);
-//
-//             change_char(s, '"', '\'');
-//
-//             if(strcmp(key, "tm")==0) {
-//                 char temp[256];
-//                 snprintf(temp, sizeof(temp),
-//                     "('epoch'::timestamptz + %s * '1 second'::interval)", s
-//                 );
-//                 gbmem_free(s);
-//
-//                 s = gbmem_strdup(temp);
-//             }
-//
-//             gbuf_append_string(gbuf, s);
-//             gbmem_free(s);
-//         }
-//
-//         idx++;
-//     }
-//
-//     gbuf_printf(gbuf, ");");
-//     char *p = gbuf_cur_rd_pointer(gbuf);
-//     json_t *jn_query = json_string(p);
-//     gbuf_decref(gbuf);
-//
-//     JSON_DECREF(msg);
-//     return jn_query;
-// }
+PRIVATE json_t *record2insertsql(
+    hgobj gobj,
+    const char *table,
+    json_t *msg // owned
+)
+{
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    GBUFFER *gbuf = gbuf_create(1*1024, 1*1024, 0, 0);
+
+    gbuf_printf(gbuf, "INSERT INTO %s (", table);
+
+    int idx = 0;
+    const char *key; json_t *value;
+    json_object_foreach(msg, key, value) {
+        if(idx > 0) {
+            gbuf_append_char(gbuf, ',');
+        }
+        if(strcmp(key, "__md_tranger__")==0) {
+            gbuf_printf(gbuf, "%s", "rowid");
+        } else {
+            gbuf_printf(gbuf, "%s", key);
+        }
+        idx++;
+    }
+
+    gbuf_printf(gbuf, ") VALUES (");
+
+    idx = 0;
+    json_object_foreach(msg, key, value) {
+        if(idx > 0) {
+            gbuf_append_char(gbuf, ',');
+        }
+
+        if(strcmp(key, "__md_tranger__")==0) {
+            gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, kw_get_int(value, "__rowid__", 0, KW_REQUIRED));
+        } else {
+            char *s = json2uglystr(value);
+            // TODO IMPORTANTE char *ss = PQescapeLiteral(priv->conn, const char *str, size_t length);
+
+            change_char(s, '"', '\'');
+
+            if(strcmp(key, "tm")==0) {
+                char temp[256];
+                snprintf(temp, sizeof(temp),
+                    "('epoch'::timestamptz + %s * '1 second'::interval)", s
+                );
+                gbmem_free(s);
+
+                s = gbmem_strdup(temp);
+            }
+
+            gbuf_append_string(gbuf, s);
+            gbmem_free(s);
+        }
+
+        idx++;
+    }
+
+    gbuf_printf(gbuf, ");");
+    char *p = gbuf_cur_rd_pointer(gbuf);
+    json_t *jn_query = json_string(p);
+    gbuf_decref(gbuf);
+
+    JSON_DECREF(msg);
+    return jn_query;
+}
 
 /***************************************************************************
  *
@@ -594,39 +641,21 @@ PRIVATE int process_msg(
     gobj_send_event(
         gobj_task,
         "EV_ADD_JOB",
-        json_pack("{s:s, s:s, s:s, s:O}",
-            "id", "create_table_if_not_exists",
-            "exec_action", "action_create_table_if_not_exists",
-            "exec_result", "result_create_table_if_not_exists",
-            "kw", kw
-        ),
-        gobj
-    );
-
-    /*
-     *  Add row
-     */
-    gobj_send_event(
-        gobj_task,
-        "EV_ADD_JOB",
-        json_pack("{s:s, s:s, s:s}",
-            "id", "add_row",
-            "exec_action", "action_add_row",
-            "exec_result", "result_add_row"
-        ),
-        gobj
-    );
-
-    /*
-     *  Send ack
-     */
-    gobj_send_event(
-        gobj_task,
-        "EV_ADD_JOB",
-        json_pack("{s:s, s:s, s:s}",
-            "id", "send_ack",
-            "exec_action", "action_send_ack",
-            "exec_result", "result_send_ack"
+        json_pack("{s:s, s:O, s:n, s:["
+                "{s:s, s:s},"
+                "{s:s, s:s},"
+                "{s:s, s:s}"
+                "]}",
+            "id", task_name,
+            "input_data", kw,
+            "output_data",
+            "jobs",
+                "exec_action", "action_create_table_if_not_exists",
+                "exec_result", "result_create_table_if_not_exists",
+                "exec_action", "action_add_row",
+                "exec_result", "result_add_row",
+                "exec_action", "action_list_rows",
+                "exec_result", "result_list_rows"
         ),
         gobj
     );
@@ -635,24 +664,6 @@ PRIVATE int process_msg(
      *      Play task
      *-----------------------*/
     gobj_play(gobj_task);
-
-
-    //     json_t *query;
-//     query = json_pack("{s:o}",
-//         "query",
-//         record2insertsql(gobj, "tracks_geodb2", msg)
-//     );
-//     print_json(query); // TODO TEST
-//
-//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
-//
-//     query = json_pack("{s:s}",
-//         "query", "SELECT * from tracks_geodb2;"
-//     );
-//
-//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
-
-
 
     return -1; // Don't send ack
 }
@@ -789,12 +800,6 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-
-    gobj_pause(src);
-    gobj_stop(src);
-    gobj_destroy(src);
-
     KW_DECREF(kw);
     return 0;
 }
@@ -881,10 +886,10 @@ PRIVATE FSM fsm = {
 PRIVATE LMETHOD lmt[] = {
     {"action_add_row",                      action_add_row, 0},
     {"result_add_row",                      result_add_row, 0},
-    {"action_send_ack",                     action_send_ack, 0},
-    {"result_send_ack",                     result_send_ack, 0},
     {"action_create_table_if_not_exists",   action_create_table_if_not_exists, 0},
     {"result_create_table_if_not_exists",   result_create_table_if_not_exists, 0},
+    {"action_list_rows",                    action_list_rows, 0},
+    {"result_list_rows",                    result_list_rows, 0},
     {0, 0, 0}
 };
 
