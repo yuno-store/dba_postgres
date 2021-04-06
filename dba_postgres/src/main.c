@@ -155,6 +155,8 @@ int main(int argc, char *argv[])
 //     gobj_set_gobj_trace(0, "ev_kw", TRUE, 0);
 //     gobj_set_gobj_trace(0, "libuv", TRUE, 0);
 
+     //set_auto_kill_time(5);
+
     /*------------------------------------------------*
      *          Start yuneta
      *------------------------------------------------*/

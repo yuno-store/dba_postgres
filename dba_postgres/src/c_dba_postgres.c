@@ -24,6 +24,11 @@
 /***************************************************************************
  *              Prototypes
  ***************************************************************************/
+PRIVATE json_t *record2createtable(
+    hgobj gobj,
+    const char *table,
+    json_t *msg // owned
+);
 PRIVATE json_t *record2insertsql(
     hgobj gobj,
     const char *table,
@@ -339,7 +344,7 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 
 
             /***************************
-             *      Local Methods
+             *      Jobs
              ***************************/
 
 
@@ -348,124 +353,169 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *action_create_table_if_not_exists(hgobj gobj, void *data)
+PRIVATE json_t *action_create_table_if_not_exists(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    json_t *kw_ = data; // not owned
 
-        //gobj_stop_tree(src);
-        //gobj_send_event(src, "EV_DROP", 0, gobj);
+    json_t *input_data = gobj_read_json_attr(src, "input_data");
+    json_t *_dba_postgres = kw_get_dict(input_data, "_dba_postgres", 0, KW_REQUIRED);
 
-    json_t *query;
-    query = json_pack("{s:s}",
+    json_t *query = json_pack("{s:o}",
         "query",
-        "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
-            "rowid       bigint PRIMARY KEY,"
-            "id          text,"
-            "name        text,"
-            "event       text,"
-            "tm          timestamp,"
-            "priority    bigint,"
-            "gps_fixed   boolean,"
-            "accuracy    bigint,"
-            "speed       bigint,"
-            "battery     bigint,"
-            "altitude    bigint,"
-            "heading     bigint,"
-            "longitude   real,"
-            "latitude    real"
-        ");"
+        record2createtable(
+            gobj,
+            "tracks_geodb2",
+            _dba_postgres
+        )
     );
     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
+    KW_DECREF(kw);
+    return 0; // continue
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE json_t *result_create_table_if_not_exists(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
+{
+    int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
+    KW_DECREF(kw);
+    return (void *)(size_t)result;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE json_t *action_add_row(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
+{
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    json_t *input_data = gobj_read_json_attr(src, "input_data");
+
+//     json_t *query = json_pack("{s:o}",
+//         "query",
+//         record2insertsql(
+//             gobj,
+//             "tracks_geodb2",
+//             input_data
+//         )
+//     );
+//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+
+// TODO
+json_t *_dba_postgres = kw_get_dict(input_data, "_dba_postgres", 0, KW_REQUIRED);
+json_t *query = json_pack("{s:o}",
+    "query",
+    record2createtable(
+        gobj,
+        "tracks_geodb2",
+        _dba_postgres
+    )
+);
+gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+
+    KW_DECREF(kw);
     return (void *)0; // continue
 }
 
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *result_create_table_if_not_exists(hgobj gobj, void *data)
+PRIVATE json_t *result_add_row(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
 {
-    json_t *kw_ = data; // not owned
+    json_t *jn_msg = kw;
 
-    return (void *)0; // continue
+    int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
+    if(result == 0) {
+        json_t *__temp__ = kw_get_dict_value(jn_msg, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
+
+        json_t *kw_ack = trq_answer(
+            jn_msg,  // not owned
+            0
+        );
+
+        if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+            trace_msg("  -> BACK ack rowid %"JSON_INTEGER_FORMAT"",
+                kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED)
+            );
+        }
+        send_ack(
+            gobj,
+            kw_ack, // owned
+            __temp__ // Set the channel
+        );
+    }
+
+    KW_DECREF(kw);
+    return (void *)(size_t)result;
 }
 
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *action_add_row(hgobj gobj, void *data)
+PRIVATE json_t *action_list_rows(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    json_t *jn_msg = data; // not owned
-
-print_json(jn_msg);
-
-    json_t *query;
-    query = json_pack("{s:o}",
-        "query",
-        record2insertsql(gobj, "tracks_geodb2", jn_msg)
-    );
-    print_json(query); // TODO TEST
-
-    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
 //     query = json_pack("{s:s}",
 //         "query", "SELECT * from tracks_geodb2;"
 //     );
 //     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
+    KW_DECREF(kw);
     return (void *)0; // continue
 }
 
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE void *result_add_row(hgobj gobj, void *data)
+PRIVATE json_t *result_list_rows(
+    hgobj gobj,
+    const char *lmethod,
+    json_t *kw,
+    hgobj src
+)
 {
-    json_t *jn_msg = data; // not owned
 
-    json_t *__temp__ = kw_get_dict_value(jn_msg, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
-
-    json_t *kw_ack = trq_answer(
-        jn_msg,  // not owned
-        0
-    );
-
-    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-        trace_msg("  -> BACK ack rowid %"JSON_INTEGER_FORMAT"",
-            kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED)
-        );
-    }
-    send_ack(
-        gobj,
-        kw_ack, // owned
-        __temp__ // Set the channel
-    );
-
+    KW_DECREF(kw);
     return (void *)0; // continue
 }
 
-/***************************************************************************
- *
- ***************************************************************************/
-PRIVATE void *action_list_rows(hgobj gobj, void *data)
-{
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    json_t *jn_msg = data; // not owned
 
-    return (void *)0; // continue
-}
 
-/***************************************************************************
- *
- ***************************************************************************/
-PRIVATE void *result_list_rows(hgobj gobj, void *data)
-{
-    json_t *jn_msg = data; // not owned
 
-    return (void *)0; // continue
-}
+            /***************************
+             *      Local Methods
+             ***************************/
+
+
+
 
 /***************************************************************************
  *  Send ack to __input_side__
@@ -495,15 +545,55 @@ PRIVATE int send_ack(
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE json_t *record2insertsql(
+PRIVATE json_t *record2createtable(
     hgobj gobj,
     const char *table,
-    json_t *msg // owned
+    json_t *msg // not owned
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     GBUFFER *gbuf = gbuf_create(1*1024, 1*1024, 0, 0);
+
+    gbuf_printf(gbuf,
+        "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
+            "rowid       bigint PRIMARY KEY,"
+            "id          text,"
+            "name        text,"
+            "event       text,"
+            "tm          timestamp,"
+            "priority    bigint,"
+            "gps_fixed   boolean,"
+            "accuracy    bigint,"
+            "speed       bigint,"
+            "battery     bigint,"
+            "altitude    bigint,"
+            "heading     bigint,"
+            "longitude   real,"
+            "latitude    real"
+        ");"
+    );
+
+    char *p = gbuf_cur_rd_pointer(gbuf);
+    json_t *jn_query = json_string(p);
+
+    gbuf_decref(gbuf);
+
+    return jn_query;
+}
+
+/***************************************************************************
+ *
+ ***************************************************************************/
+PRIVATE json_t *record2insertsql(
+    hgobj gobj,
+    const char *table,
+    json_t *msg // not owned
+)
+{
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    GBUFFER *gbuf = gbuf_create(4*1024, 4*1024, 0, 0);
 
     gbuf_printf(gbuf, "INSERT INTO %s (", table);
 
@@ -557,9 +647,9 @@ PRIVATE json_t *record2insertsql(
     gbuf_printf(gbuf, ");");
     char *p = gbuf_cur_rd_pointer(gbuf);
     json_t *jn_query = json_string(p);
+
     gbuf_decref(gbuf);
 
-    JSON_DECREF(msg);
     return jn_query;
 }
 
@@ -612,58 +702,32 @@ PRIVATE int process_msg(
     /*-----------------------------*
      *      Create the task
      *-----------------------------*/
-    json_t *kw_task = json_pack("{s:I, s:s, s:s, s:s, s:s, s:I, s:I}",
-        "tranger", (json_int_t)(size_t)priv->tranger_tasks_,
-        "task_name", task_name,
-        "pkey", "id",
-        "tkey", "",
-        "system_flag", "sf_string_key",
+    json_t *kw_task = json_pack(
+        "{s:I, s:I, s:O, s:["
+            "{s:s, s:s},"
+            "{s:s, s:s},"
+            "{s:s, s:s}"
+            "]}",
         "gobj_jobs", (json_int_t)(size_t)gobj,
-        "gobj_results", (json_int_t)(size_t)priv->gobj_postgres
+        "gobj_results", (json_int_t)(size_t)priv->gobj_postgres,
+        "input_data", kw,
+        "jobs",
+            "exec_action", "action_create_table_if_not_exists",
+            "exec_result", "result_create_table_if_not_exists",
+            "exec_action", "action_add_row",
+            "exec_result", "result_add_row",
+            "exec_action", "action_list_rows",
+            "exec_result", "result_list_rows"
     );
+
     hgobj gobj_task = gobj_create_unique(task_name, GCLASS_TASK, kw_task, gobj);
     gobj_subscribe_event(gobj_task, "EV_END_TASK", 0, gobj);
+    gobj_set_volatil(gobj_task, TRUE); // auto-destroy
 
     /*-----------------------*
      *      Start task
      *-----------------------*/
-    if(gobj_start(gobj_task)<0) {
-        gobj_destroy(gobj_task);
-        return -1; // Don't send ack
-    }
-
-    /*---------------------------------*
-     *      Create the task's jobs
-     *---------------------------------*/
-    /*
-     *  Create the table if not exists
-     */
-    gobj_send_event(
-        gobj_task,
-        "EV_ADD_JOB",
-        json_pack("{s:s, s:O, s:n, s:["
-                "{s:s, s:s},"
-                "{s:s, s:s},"
-                "{s:s, s:s}"
-                "]}",
-            "id", task_name,
-            "input_data", kw,
-            "output_data",
-            "jobs",
-                "exec_action", "action_create_table_if_not_exists",
-                "exec_result", "result_create_table_if_not_exists",
-                "exec_action", "action_add_row",
-                "exec_result", "result_add_row",
-                "exec_action", "action_list_rows",
-                "exec_result", "result_list_rows"
-        ),
-        gobj
-    );
-
-    /*-----------------------*
-     *      Play task
-     *-----------------------*/
-    gobj_play(gobj_task);
+    gobj_start(gobj_task);
 
     return -1; // Don't send ack
 }
@@ -800,6 +864,11 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
+    int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
+
+    if(result < 0) {
+    }
+
     KW_DECREF(kw);
     return 0;
 }
