@@ -436,14 +436,13 @@ PRIVATE json_t *result_add_row(
     hgobj src
 )
 {
-    json_t *jn_msg = kw;
-
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
-    if(result == 0) {
-        json_t *__temp__ = kw_get_dict_value(jn_msg, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
+    if(result == 0 || 1) { // Send ack always
+        json_t *input_data = gobj_read_json_attr(src, "input_data");
+        json_t *__temp__ = kw_get_dict_value(input_data, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
 
         json_t *kw_ack = trq_answer(
-            jn_msg,  // not owned
+            input_data,  // not owned
             0
         );
 
@@ -455,7 +454,7 @@ PRIVATE json_t *result_add_row(
         send_ack(
             gobj,
             kw_ack, // owned
-            __temp__ // Set the channel
+            __temp__ // owned, Set the channel
         );
     }
 
@@ -463,41 +462,41 @@ PRIVATE json_t *result_add_row(
     return (void *)(size_t)result;
 }
 
-/***************************************************************************
- *
- ***************************************************************************/
-PRIVATE json_t *action_list_rows(
-    hgobj gobj,
-    const char *lmethod,
-    json_t *kw,
-    hgobj src
-)
-{
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-
-    json_t *query = json_pack("{s:s}",
-        "query", "SELECT * from tracks_geodb2;"
-    );
-    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
-
-    KW_DECREF(kw);
-    return (void *)0; // continue
-}
-
-/***************************************************************************
- *
- ***************************************************************************/
-PRIVATE json_t *result_list_rows(
-    hgobj gobj,
-    const char *lmethod,
-    json_t *kw,
-    hgobj src
-)
-{
-
-    KW_DECREF(kw);
-    return (void *)0; // continue
-}
+// /***************************************************************************
+//  *
+//  ***************************************************************************/
+// PRIVATE json_t *action_list_rows(
+//     hgobj gobj,
+//     const char *lmethod,
+//     json_t *kw,
+//     hgobj src
+// )
+// {
+//     PRIVATE_DATA *priv = gobj_priv_data(gobj);
+//
+//     json_t *query = json_pack("{s:s}",
+//         "query", "SELECT * from tracks_geodb2;"
+//     );
+//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+//
+//     KW_DECREF(kw);
+//     return (void *)0; // continue
+// }
+//
+// /***************************************************************************
+//  *
+//  ***************************************************************************/
+// PRIVATE json_t *result_list_rows(
+//     hgobj gobj,
+//     const char *lmethod,
+//     json_t *kw,
+//     hgobj src
+// )
+// {
+//
+//     KW_DECREF(kw);
+//     return (void *)0; // continue
+// }
 
 
 
@@ -515,7 +514,7 @@ PRIVATE json_t *result_list_rows(
 PRIVATE int send_ack(
     hgobj gobj,
     json_t *kw_ack,  // owned
-    json_t *__temp__ // channel info
+    json_t *__temp__ // owned, channel info
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
@@ -542,11 +541,10 @@ PRIVATE json_t *record2createtable(
     json_t *schema // not owned
 )
 {
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-
     const char *topic_name = kw_get_str(schema, "id", "", KW_REQUIRED);
     const char *pkey = kw_get_str(schema, "pkey", "", KW_REQUIRED);
-    const char *pkey2s = kw_get_str(schema, "pkey2s", "", KW_REQUIRED);
+    // TODO add secondary keys
+    //const char *pkey2s = kw_get_str(schema, "pkey2s", "", KW_REQUIRED);
     BOOL use_header = kw_get_bool(schema, "use_header", 0, KW_REQUIRED);
 
     GBUFFER *gbuf = gbuf_create(8*1024, 8*1024, 0, 0);
@@ -640,8 +638,6 @@ PRIVATE json_t *record2insertsql(
     json_t *record // not owned
 )
 {
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-
     const char *topic_name = kw_get_str(schema, "id", "", KW_REQUIRED);
     BOOL use_header = kw_get_bool(schema, "use_header", 0, KW_REQUIRED);
 
@@ -795,7 +791,6 @@ PRIVATE int process_msg(
     json_t *kw_task = json_pack(
         "{s:I, s:I, s:O, s:["
             "{s:s, s:s},"
-            "{s:s, s:s},"
             "{s:s, s:s}"
             "]}",
         "gobj_jobs", (json_int_t)(size_t)gobj,
@@ -805,9 +800,7 @@ PRIVATE int process_msg(
             "exec_action", "action_create_table_if_not_exists",
             "exec_result", "result_create_table_if_not_exists",
             "exec_action", "action_add_row",
-            "exec_result", "result_add_row",
-            "exec_action", "action_list_rows",
-            "exec_result", "result_list_rows"
+            "exec_result", "result_add_row"
     );
 
     hgobj gobj_task = gobj_create_unique(task_name, GCLASS_TASK, kw_task, gobj);
@@ -909,27 +902,11 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
                 );
             }
 
-            ret = process_msg(gobj, jn_msg, src);
-            if(ret == 0) {
-                json_t *__temp__ = kw_get_dict_value(kw, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
-
-                json_t *kw_ack = trq_answer(
-                    jn_msg,  // not owned
-                    0
-                );
-
-                if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-                    trace_msg("  -> BACK ack rowid %"JSON_INTEGER_FORMAT"",
-                        kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED)
-                    );
-                }
-                send_ack(
-                    gobj,
-                    kw_ack, // owned
-                    __temp__ // Set the channel
-                );
-            }
+            json_t *__temp__ = kw_get_dict_value(kw, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
+            json_object_set_new(jn_msg, "__temp__", __temp__);
+            process_msg(gobj, jn_msg, src);
             JSON_DECREF(jn_msg);
+
         } else {
             ret = -1;
         }
@@ -1047,8 +1024,6 @@ PRIVATE LMETHOD lmt[] = {
     {"result_add_row",                      result_add_row, 0},
     {"action_create_table_if_not_exists",   action_create_table_if_not_exists, 0},
     {"result_create_table_if_not_exists",   result_create_table_if_not_exists, 0},
-    {"action_list_rows",                    action_list_rows, 0},
-    {"result_list_rows",                    result_list_rows, 0},
     {0, 0, 0}
 };
 
