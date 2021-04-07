@@ -26,13 +26,12 @@
  ***************************************************************************/
 PRIVATE json_t *record2createtable(
     hgobj gobj,
-    const char *table,
-    json_t *msg // owned
+    json_t *schema // not owned
 );
 PRIVATE json_t *record2insertsql(
     hgobj gobj,
-    const char *table,
-    json_t *msg // owned
+    json_t *schema, // not owned
+    json_t *record // not owned
 );
 
 PRIVATE int send_ack(
@@ -350,6 +349,11 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 
 
 
+/*
+ *  TODO gobj_results puede dar soporte a varias tasks,
+ *  hay que suscribirse con algún tipo de id
+ */
+
 /***************************************************************************
  *
  ***************************************************************************/
@@ -363,14 +367,13 @@ PRIVATE json_t *action_create_table_if_not_exists(
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     json_t *input_data = gobj_read_json_attr(src, "input_data");
-    json_t *_dba_postgres = kw_get_dict(input_data, "_dba_postgres", 0, KW_REQUIRED);
+    json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
     json_t *query = json_pack("{s:o}",
         "query",
         record2createtable(
             gobj,
-            "tracks_geodb2",
-            _dba_postgres
+            schema_
         )
     );
     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
@@ -407,28 +410,17 @@ PRIVATE json_t *action_add_row(
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     json_t *input_data = gobj_read_json_attr(src, "input_data");
+    json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
-//     json_t *query = json_pack("{s:o}",
-//         "query",
-//         record2insertsql(
-//             gobj,
-//             "tracks_geodb2",
-//             input_data
-//         )
-//     );
-//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
-
-// TODO
-json_t *_dba_postgres = kw_get_dict(input_data, "_dba_postgres", 0, KW_REQUIRED);
-json_t *query = json_pack("{s:o}",
-    "query",
-    record2createtable(
-        gobj,
-        "tracks_geodb2",
-        _dba_postgres
-    )
-);
-gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+    json_t *query = json_pack("{s:o}",
+        "query",
+        record2insertsql(
+            gobj,
+            schema_,
+            input_data
+        )
+    );
+    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     KW_DECREF(kw);
     return (void *)0; // continue
@@ -483,10 +475,10 @@ PRIVATE json_t *action_list_rows(
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-//     query = json_pack("{s:s}",
-//         "query", "SELECT * from tracks_geodb2;"
-//     );
-//     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
+    json_t *query = json_pack("{s:s}",
+        "query", "SELECT * from tracks_geodb2;"
+    );
+    gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     KW_DECREF(kw);
     return (void *)0; // continue
@@ -547,30 +539,87 @@ PRIVATE int send_ack(
  ***************************************************************************/
 PRIVATE json_t *record2createtable(
     hgobj gobj,
-    const char *table,
-    json_t *msg // not owned
+    json_t *schema // not owned
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-    GBUFFER *gbuf = gbuf_create(1*1024, 1*1024, 0, 0);
+    const char *topic_name = kw_get_str(schema, "id", "", KW_REQUIRED);
+    const char *pkey = kw_get_str(schema, "pkey", "", KW_REQUIRED);
+    const char *pkey2s = kw_get_str(schema, "pkey2s", "", KW_REQUIRED);
+    BOOL use_header = kw_get_bool(schema, "use_header", 0, KW_REQUIRED);
+
+    GBUFFER *gbuf = gbuf_create(8*1024, 8*1024, 0, 0);
 
     gbuf_printf(gbuf,
-        "CREATE TABLE IF NOT EXISTS tracks_geodb2 ("
-            "rowid       bigint PRIMARY KEY,"
-            "id          text,"
-            "name        text,"
-            "event       text,"
-            "tm          timestamp,"
-            "priority    bigint,"
-            "gps_fixed   boolean,"
-            "accuracy    bigint,"
-            "speed       bigint,"
-            "battery     bigint,"
-            "altitude    bigint,"
-            "heading     bigint,"
-            "longitude   real,"
-            "latitude    real"
+        "CREATE TABLE IF NOT EXISTS %s (",
+        topic_name
+    );
+    json_t *cols = kw_get_dict(schema, "cols", 0, KW_REQUIRED);
+
+    int idx = 0;
+    const char *col_name; json_t *col;
+    json_object_foreach(cols, col_name, col) {
+        if(idx > 0) {
+            gbuf_printf(gbuf, "," );
+        }
+        const char *header = kw_get_str(col, "header", "", KW_REQUIRED);
+        const char *type = kw_get_str(col, "type", "", KW_REQUIRED);
+        SWITCHS(type) {
+            CASES("string")
+                gbuf_printf(gbuf, "%s %s",
+                    use_header?header:col_name,
+                    "text"
+                );
+                break;
+
+            CASES("integer")
+                gbuf_printf(gbuf, "%s %s",
+                    use_header?header:col_name,
+                    "bigint"
+                );
+                break;
+
+            CASES("time")
+                gbuf_printf(gbuf, "%s %s",
+                    use_header?header:col_name,
+                    "timestamp"
+                );
+                break;
+
+            CASES("real")
+                gbuf_printf(gbuf, "%s %s",
+                    use_header?header:col_name,
+                    "double precision"
+                );
+                break;
+
+            CASES("boolean")
+                gbuf_printf(gbuf, "%s %s",
+                    use_header?header:col_name,
+                    "boolean"
+                );
+                break;
+
+            DEFAULTS
+                log_error(0,
+                    "gobj",         "%s", gobj_full_name(gobj),
+                    "function",     "%s", __FUNCTION__,
+                    "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+                    "msg",          "%s", "Type header UNKNOWN",
+                    "type",         "%s", type,
+                    NULL
+                );
+                break;
+        } SWITCHS_END;
+
+        if(strcmp(col_name, pkey)==0) {
+            gbuf_printf(gbuf, " PRIMARY KEY");
+        }
+        idx++;
+    }
+
+    gbuf_printf(gbuf,
         ");"
     );
 
@@ -587,59 +636,100 @@ PRIVATE json_t *record2createtable(
  ***************************************************************************/
 PRIVATE json_t *record2insertsql(
     hgobj gobj,
-    const char *table,
-    json_t *msg // not owned
+    json_t *schema, // not owned
+    json_t *record // not owned
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-    GBUFFER *gbuf = gbuf_create(4*1024, 4*1024, 0, 0);
+    const char *topic_name = kw_get_str(schema, "id", "", KW_REQUIRED);
+    BOOL use_header = kw_get_bool(schema, "use_header", 0, KW_REQUIRED);
 
-    gbuf_printf(gbuf, "INSERT INTO %s (", table);
+    GBUFFER *gbuf = gbuf_create(32*1024, 32*1024, 0, 0);
+
+    gbuf_printf(gbuf, "INSERT INTO %s (", topic_name);
+
+    json_t *cols = kw_get_dict(schema, "cols", 0, KW_REQUIRED);
 
     int idx = 0;
-    const char *key; json_t *value;
-    json_object_foreach(msg, key, value) {
+    const char *col_name; json_t *col;
+    json_object_foreach(cols, col_name, col) {
         if(idx > 0) {
-            gbuf_append_char(gbuf, ',');
+            gbuf_printf(gbuf, "," );
         }
-        if(strcmp(key, "__md_tranger__")==0) {
-            gbuf_printf(gbuf, "%s", "rowid");
+        if(use_header) {
+            const char *header = kw_get_str(col, "header", "", KW_REQUIRED);
+            gbuf_printf(gbuf, "%s", header);
         } else {
-            gbuf_printf(gbuf, "%s", key);
+            gbuf_printf(gbuf, "%s", col_name);
         }
+
         idx++;
     }
 
     gbuf_printf(gbuf, ") VALUES (");
 
     idx = 0;
-    json_object_foreach(msg, key, value) {
+    json_object_foreach(cols, col_name, col) {
         if(idx > 0) {
-            gbuf_append_char(gbuf, ',');
+            gbuf_printf(gbuf, "," );
         }
 
-        if(strcmp(key, "__md_tranger__")==0) {
-            gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, kw_get_int(value, "__rowid__", 0, KW_REQUIRED));
-        } else {
-            char *s = json2uglystr(value);
-            // TODO IMPORTANTE char *ss = PQescapeLiteral(priv->conn, const char *str, size_t length);
+        const char *type = kw_get_str(col, "type", "", KW_REQUIRED);
+        SWITCHS(type) {
+            CASES("string")
+                json_t *value = kw_get_dict_value(record, col_name, 0, KW_REQUIRED);
+                if(value) {
+                    char *s = json2uglystr(value);
+                    change_char(s, '"', '\'');
+                    // TODO IMPORTANTE char *ss = PQescapeLiteral(priv->conn, s, strlen(s));
+                    gbuf_append_string(gbuf, s);
+                    gbmem_free(s);
+                }
+                break;
 
-            change_char(s, '"', '\'');
+            CASES("integer")
+                json_int_t value = kw_get_int(record, col_name, 0, KW_REQUIRED|KW_WILD_NUMBER);
+                gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, value);
+                break;
 
-            if(strcmp(key, "tm")==0) {
-                char temp[256];
-                snprintf(temp, sizeof(temp),
-                    "('epoch'::timestamptz + %s * '1 second'::interval)", s
+            CASES("time")
+                json_t *value = kw_get_dict_value(record, col_name, 0, KW_REQUIRED);
+                if(value) {
+                    char *s = json2uglystr(value);
+                    char temp[256];
+                    snprintf(temp, sizeof(temp),
+                        "('epoch'::timestamp + %s * '1 second'::interval)", s
+                    );
+                    gbmem_free(s);
+
+                    s = gbmem_strdup(temp);
+                    gbuf_append_string(gbuf, s);
+                    gbmem_free(s);
+                }
+                break;
+
+            CASES("real")
+                double value = kw_get_real(record, col_name, 0, KW_REQUIRED|KW_WILD_NUMBER);
+                gbuf_printf(gbuf, "%f", value);
+                break;
+
+            CASES("boolean")
+                BOOL value = kw_get_bool(record, col_name, 0, KW_REQUIRED|KW_WILD_NUMBER);
+                gbuf_printf(gbuf, "%s", value?"TRUE":"FALSE");
+                break;
+
+            DEFAULTS
+                log_error(0,
+                    "gobj",         "%s", gobj_full_name(gobj),
+                    "function",     "%s", __FUNCTION__,
+                    "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+                    "msg",          "%s", "Type header UNKNOWN",
+                    "type",         "%s", type,
+                    NULL
                 );
-                gbmem_free(s);
-
-                s = gbmem_strdup(temp);
-            }
-
-            gbuf_append_string(gbuf, s);
-            gbmem_free(s);
-        }
+                break;
+        } SWITCHS_END;
 
         idx++;
     }
