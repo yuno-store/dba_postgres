@@ -108,8 +108,6 @@ typedef struct _PRIVATE_DATA {
     hgobj gobj_input_side;
     hgobj gobj_postgres;
 
-    hgobj gobj_tranger_tasks;
-    json_t *tranger_tasks_;
     int32_t exit_on_error;
 
     uint64_t *ptxMsgs;
@@ -172,51 +170,6 @@ PRIVATE void mt_create(hgobj gobj)
         trace_msg("User or group 'yuneta' is needed to run %s", gobj_yuno_role());
         printf("User or group 'yuneta' is needed to run %s\n", gobj_yuno_role());
         exit(0);
-    }
-
-    /*----------------------------*
-     *  Create Tasks Timeranger
-     *----------------------------*/
-    const char *filename_mask = gobj_read_str_attr(gobj, "filename_mask");
-    BOOL master = gobj_read_bool_attr(gobj, "master");
-    int exit_on_error = gobj_read_int32_attr(gobj, "exit_on_error");
-    int xpermission = gobj_read_int32_attr(gobj, "xpermission");
-    int rpermission = gobj_read_int32_attr(gobj, "rpermission");
-
-    char path[PATH_MAX];
-    yuneta_realm_store_dir(
-        path,
-        sizeof(path),
-        gobj_yuno_role(),
-        gobj_yuno_realm_owner(),
-        gobj_yuno_realm_id(),
-        "tasks",
-        TRUE
-    );
-
-    json_t *kw_tranger = json_pack("{s:s, s:s, s:b, s:i, s:i, s:i}",
-        "path", path,
-        "filename_mask", filename_mask,
-        "master", master,
-        "on_critical_error", exit_on_error,
-        "xpermission", xpermission,
-        "rpermission", rpermission
-    );
-    priv->gobj_tranger_tasks = gobj_create_service(
-        "tranger_tasks",
-        GCLASS_TRANGER,
-        kw_tranger,
-        gobj
-    );
-    priv->tranger_tasks_ = gobj_read_pointer_attr(priv->gobj_tranger_tasks, "tranger");
-    if(!priv->tranger_tasks_) {
-        log_critical(priv->exit_on_error,
-            "gobj",         "%s", gobj_full_name(gobj),
-            "function",     "%s", __FUNCTION__,
-            "msgset",       "%s", MSGSET_PARAMETER_ERROR,
-            "msg",          "%s", "tranger NULL",
-            NULL
-        );
     }
 }
 
