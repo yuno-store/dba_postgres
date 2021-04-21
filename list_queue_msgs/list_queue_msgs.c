@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
 
     gbmem_startup_system(
         MEM_MAX_BLOCK,
-        (INT_MAX> MEM_MAX_SYSTEM_MEMORY)? INT_MAX:MEM_MAX_SYSTEM_MEMORY
+        (INT_MAX < MEM_MAX_SYSTEM_MEMORY)? INT_MAX:MEM_MAX_SYSTEM_MEMORY
     );
 //     gbmem_startup( /* Create memory core */
 //         MEM_MIN_BLOCK,
