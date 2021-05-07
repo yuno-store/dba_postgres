@@ -517,6 +517,7 @@ PRIVATE json_t *record2createtable(
         const char *header = kw_get_str(col, "header", "", KW_REQUIRED);
         const char *type = kw_get_str(col, "type", "", KW_REQUIRED);
         SWITCHS(type) {
+            CASES("str")
             CASES("string")
                 gbuf_printf(gbuf, "%s %s",
                     use_header?header:col_name,
@@ -524,6 +525,7 @@ PRIVATE json_t *record2createtable(
                 );
                 break;
 
+            CASES("int")
             CASES("integer")
                 gbuf_printf(gbuf, "%s %s",
                     use_header?header:col_name,
@@ -545,6 +547,7 @@ PRIVATE json_t *record2createtable(
                 );
                 break;
 
+            CASES("bool")
             CASES("boolean")
                 gbuf_printf(gbuf, "%s %s",
                     use_header?header:col_name,
@@ -626,6 +629,7 @@ PRIVATE json_t *record2insertsql(
 
         const char *type = kw_get_str(col, "type", "", KW_REQUIRED);
         SWITCHS(type) {
+            CASES("str")
             CASES("string")
                 json_t *value = kw_get_dict_value(record, col_name, 0, KW_REQUIRED);
                 if(value) {
@@ -637,6 +641,7 @@ PRIVATE json_t *record2insertsql(
                 }
                 break;
 
+            CASES("int")
             CASES("integer")
                 json_int_t value = kw_get_int(record, col_name, 0, KW_REQUIRED|KW_WILD_NUMBER);
                 gbuf_printf(gbuf, "%"JSON_INTEGER_FORMAT, value);
@@ -663,6 +668,7 @@ PRIVATE json_t *record2insertsql(
                 gbuf_printf(gbuf, "%f", value);
                 break;
 
+            CASES("bool")
             CASES("boolean")
                 BOOL value = kw_get_bool(record, col_name, 0, KW_REQUIRED|KW_WILD_NUMBER);
                 gbuf_printf(gbuf, "%s", value?"TRUE":"FALSE");
