@@ -238,7 +238,7 @@ PRIVATE int mt_play(hgobj gobj)
     gobj_start_tree(priv->gobj_postgres);
 
     /*
-     *  Periodic timer for tasks
+     *  Periodic timer
      */
     set_timeout_periodic(priv->timer, priv->timeout);
 
