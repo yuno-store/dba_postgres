@@ -234,7 +234,7 @@ PRIVATE int mt_play(hgobj gobj)
     gobj_start_tree(priv->gobj_input_side);
 
     priv->gobj_postgres = gobj_find_service("__postgres__", TRUE);
-    // Don't subscribe, will do the tasks
+    // HACK Don't subscribe events, will do the tasks
     gobj_start_tree(priv->gobj_postgres);
 
     /*
