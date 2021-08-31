@@ -332,7 +332,7 @@ PRIVATE json_t *action_create_table_if_not_exists(
     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     KW_DECREF(kw);
-    return 0; // continue
+    CONTINUE_TASK();
 }
 
 /***************************************************************************
@@ -347,7 +347,11 @@ PRIVATE json_t *result_create_table_if_not_exists(
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
     KW_DECREF(kw);
-    return (void *)(size_t)result;
+    if(result == 0) {
+        CONTINUE_TASK();
+    } else {
+        STOP_TASK();
+    }
 }
 
 /***************************************************************************
