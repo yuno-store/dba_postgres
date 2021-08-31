@@ -376,7 +376,7 @@ PRIVATE json_t *action_add_row(
     gobj_send_event(priv->gobj_postgres, "EV_SEND_QUERY", query, gobj);
 
     KW_DECREF(kw);
-    return (void *)0; // continue
+    CONTINUE_TASK();
 }
 
 /***************************************************************************
@@ -412,7 +412,7 @@ PRIVATE json_t *result_add_row(
     }
 
     KW_DECREF(kw);
-    return (void *)(size_t)result;
+    CONTINUE_TASK();
 }
 
 // /***************************************************************************
