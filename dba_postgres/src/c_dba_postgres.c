@@ -314,7 +314,7 @@ PRIVATE json_t *action_create_table_if_not_exists(
     hgobj gobj,
     const char *lmethod,
     json_t *kw,
-    hgobj src
+    hgobj src // Source is the GCLASS_TASK
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
@@ -342,7 +342,7 @@ PRIVATE json_t *result_create_table_if_not_exists(
     hgobj gobj,
     const char *lmethod,
     json_t *kw,
-    hgobj src
+    hgobj src // Source is the GCLASS_TASK
 )
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
@@ -361,7 +361,7 @@ PRIVATE json_t *action_add_row(
     hgobj gobj,
     const char *lmethod,
     json_t *kw,
-    hgobj src
+    hgobj src // Source is the GCLASS_TASK
 )
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
@@ -390,7 +390,7 @@ PRIVATE json_t *result_add_row(
     hgobj gobj,
     const char *lmethod,
     json_t *kw,
-    hgobj src
+    hgobj src // Source is the GCLASS_TASK
 )
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
@@ -426,7 +426,7 @@ PRIVATE json_t *result_add_row(
 //     hgobj gobj,
 //     const char *lmethod,
 //     json_t *kw,
-//     hgobj src
+//     hgobj src // Source is the GCLASS_TASK
 // )
 // {
 //     PRIVATE_DATA *priv = gobj_priv_data(gobj);
@@ -447,7 +447,7 @@ PRIVATE json_t *result_add_row(
 //     hgobj gobj,
 //     const char *lmethod,
 //     json_t *kw,
-//     hgobj src
+//     hgobj src // Source is the GCLASS_TASK
 // )
 // {
 //
