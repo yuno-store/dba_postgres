@@ -346,10 +346,19 @@ PRIVATE json_t *result_create_table_if_not_exists(
 )
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
-    KW_DECREF(kw);
     if(result == 0) {
+        KW_DECREF(kw);
         CONTINUE_TASK();
     } else {
+        log_error(0,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+            "msg",          "%s", "Cannot create table",
+            NULL
+        );
+        log_debug_json(0, kw, "Cannot create table");
+        KW_DECREF(kw);
         STOP_TASK();
     }
 }
@@ -413,6 +422,17 @@ PRIVATE json_t *result_add_row(
             kw_ack, // owned
             __temp__ // owned, Set the channel
         );
+
+        if(result < 0) {
+            log_error(0,
+                "gobj",         "%s", gobj_full_name(gobj),
+                "function",     "%s", __FUNCTION__,
+                "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+                "msg",          "%s", "Cannot add row",
+                NULL
+            );
+            log_debug_json(0, kw, "Cannot add row");
+        }
     }
 
     KW_DECREF(kw);
@@ -575,6 +595,14 @@ PRIVATE json_t *record2createtable(
             gbuf_printf(gbuf, " PRIMARY KEY");
         }
         idx++;
+    }
+
+    if(1) {
+        // Añade automaticamente campo creacion
+        if(idx > 0) {
+            gbuf_printf(gbuf, "," );
+        }
+        gbuf_printf(gbuf, "__created_at__ TIMESTAMPTZ NOT NULL DEFAULT NOW()");
     }
 
     gbuf_printf(gbuf,
