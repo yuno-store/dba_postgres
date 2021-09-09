@@ -302,11 +302,6 @@ PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 
 
 
-/*
- *  TODO gobj_results puede dar soporte a varias tasks,
- *  hay que suscribirse con algún tipo de id
- */
-
 /***************************************************************************
  *
  ***************************************************************************/
@@ -925,6 +920,7 @@ PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
 
     if(result < 0) {
+        // TODO reconecta Postgres
     }
 
     KW_DECREF(kw);
