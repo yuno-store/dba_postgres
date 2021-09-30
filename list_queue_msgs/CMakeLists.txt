@@ -62,6 +62,7 @@ TARGET_LINK_LIBRARIES(list_queue_msgs
     pthread dl  # used by libuv
     lzma        # used by libunwind
     uuid
+    m
 )
 
 ##############################################
