@@ -924,9 +924,19 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
 PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
+    const char *comment = kw_get_str(kw, "comment", "", 0);
 
     if(result < 0) {
-        // TODO reconecta Postgres
+        log_error(0,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_INTERNAL_ERROR,
+            "msg",          "%s", "Task End with error",
+            "comment",      "%s", comment,
+            "src",          "%s", gobj_full_name(src),
+            NULL
+        );
+        log_debug_json(0, kw, "Task End with error");
     }
 
     KW_DECREF(kw);
