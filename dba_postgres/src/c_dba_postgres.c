@@ -505,6 +505,9 @@ PRIVATE int send_ack(
 
     json_object_set_new(kw_send, "__temp__", __temp__);  // Set the channel
 
+    (*priv->ptxMsgs)++;
+    priv->txMsgsec++;
+
     return gobj_send_event(priv->gobj_input_side, "EV_SEND_MESSAGE", kw_send, gobj);
 }
 
