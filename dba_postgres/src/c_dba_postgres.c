@@ -409,11 +409,6 @@ PRIVATE json_t *result_add_row(
             0
         );
 
-        if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-            trace_msg("  -> BACK ack rowid %"JSON_INTEGER_FORMAT"",
-                kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED)
-            );
-        }
         send_ack(
             gobj,
             kw_ack, // owned
@@ -499,7 +494,11 @@ PRIVATE int send_ack(
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-        log_debug_json(LOG_DUMP_OUTPUT, kw_ack, "%s ==> %s", gobj_short_name(gobj), gobj_short_name(priv->gobj_input_side));
+        log_debug_json(LOG_DUMP_OUTPUT, kw_ack, "👈👈 %"JSON_INTEGER_FORMAT" %s ==> %s",
+            kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED),
+            gobj_short_name(gobj),
+            gobj_short_name(priv->gobj_input_side)
+        );
     }
 
     GBUFFER *gbuf = json2gbuf(0, kw_ack, JSON_COMPACT);
@@ -891,7 +890,8 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
         if(jn_msg) {
             hgobj channel_gobj = (hgobj)(size_t)kw_get_int(kw, "__temp__`channel_gobj", 0, KW_REQUIRED);
             if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-                log_debug_json(LOG_DUMP_INPUT, jn_msg, "%s <== %s <== %s",
+                log_debug_json(LOG_DUMP_INPUT, jn_msg, "👉👉 %"JSON_INTEGER_FORMAT" %s <== %s <== %s",
+                    kw_get_int(jn_msg, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED),
                     gobj_short_name(gobj),
                     gobj_short_name(src),
                     gobj_short_name(channel_gobj)
