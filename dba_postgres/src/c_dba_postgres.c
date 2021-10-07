@@ -494,7 +494,8 @@ PRIVATE int send_ack(
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-        log_debug_json(LOG_DUMP_OUTPUT, kw_ack, "👈👈 %"JSON_INTEGER_FORMAT" %s ==> %s",
+        log_debug_json(LOG_DUMP_OUTPUT, kw_ack,
+            "🔄🔄🔄🔄Dba_postgres 👈👈 %"JSON_INTEGER_FORMAT" %s ==> %s",
             kw_get_int(kw_ack, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED),
             gobj_short_name(gobj),
             gobj_short_name(priv->gobj_input_side)
@@ -890,7 +891,8 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
         if(jn_msg) {
             hgobj channel_gobj = (hgobj)(size_t)kw_get_int(kw, "__temp__`channel_gobj", 0, KW_REQUIRED);
             if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-                log_debug_json(LOG_DUMP_INPUT, jn_msg, "👉👉 %"JSON_INTEGER_FORMAT" %s <== %s <== %s",
+                log_debug_json(LOG_DUMP_INPUT, jn_msg,
+                        "🔄🔄🔄🔄Dba_postgres 👉👉 %"JSON_INTEGER_FORMAT" %s <== %s <== %s",
                     kw_get_int(jn_msg, __MD_TRQ__"`__msg_key__", 0, KW_REQUIRED),
                     gobj_short_name(gobj),
                     gobj_short_name(src),
