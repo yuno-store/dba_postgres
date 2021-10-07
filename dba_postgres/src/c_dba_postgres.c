@@ -349,7 +349,7 @@ PRIVATE json_t *result_create_table_if_not_exists(
         log_error(0,
             "gobj",         "%s", gobj_full_name(gobj),
             "function",     "%s", __FUNCTION__,
-            "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+            "msgset",       "%s", MSGSET_DATABASE_ERROR,
             "msg",          "%s", "Cannot create table",
             NULL
         );
@@ -421,14 +421,18 @@ PRIVATE json_t *result_add_row(
         );
 
         if(result < 0) {
+            char temp[512];
+            const char *comment = kw_get_str(kw, "comment", "", 0);
+            snprintf(temp, sizeof(temp), "Postgres: cannot add row -> %s", comment);
+            left_justify(temp);
             log_error(0,
                 "gobj",         "%s", gobj_full_name(gobj),
                 "function",     "%s", __FUNCTION__,
-                "msgset",       "%s", MSGSET_PARAMETER_ERROR,
-                "msg",          "%s", "Cannot add row",
+                "msgset",       "%s", MSGSET_DATABASE_ERROR,
+                "msg",          "%s", temp,
                 NULL
             );
-            log_debug_json(0, kw, "Cannot add row");
+            log_debug_json(0, kw, temp);
         }
     }
 
@@ -584,7 +588,7 @@ PRIVATE json_t *record2createtable(
                 log_error(0,
                     "gobj",         "%s", gobj_full_name(gobj),
                     "function",     "%s", __FUNCTION__,
-                    "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+                    "msgset",       "%s", MSGSET_DATABASE_ERROR,
                     "msg",          "%s", "Type header UNKNOWN",
                     "type",         "%s", type,
                     NULL
@@ -711,7 +715,7 @@ PRIVATE json_t *record2insertsql(
                 log_error(0,
                     "gobj",         "%s", gobj_full_name(gobj),
                     "function",     "%s", __FUNCTION__,
-                    "msgset",       "%s", MSGSET_PARAMETER_ERROR,
+                    "msgset",       "%s", MSGSET_DATABASE_ERROR,
                     "msg",          "%s", "Type header UNKNOWN",
                     "type",         "%s", type,
                     NULL
@@ -930,7 +934,7 @@ PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
         log_error(0,
             "gobj",         "%s", gobj_full_name(gobj),
             "function",     "%s", __FUNCTION__,
-            "msgset",       "%s", MSGSET_INTERNAL_ERROR,
+            "msgset",       "%s", MSGSET_APP_ERROR,
             "msg",          "%s", "Task End with error",
             "comment",      "%s", comment,
             "src",          "%s", gobj_full_name(src),
