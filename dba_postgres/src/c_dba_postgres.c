@@ -788,12 +788,12 @@ PRIVATE int process_msg(
      *      Create the task
      *-----------------------------*/
     json_t *kw_task = json_pack(
-        "{s:I, s:I, s:O, s:["
+        "{s:o, s:o, s:O, s:["
             "{s:s, s:s},"
             "{s:s, s:s}"
             "]}",
-        "gobj_jobs", (json_int_t)(size_t)gobj,
-        "gobj_results", (json_int_t)(size_t)priv->gobj_postgres,
+        "gobj_jobs", json_integer((json_int_t)(size_t)gobj),
+        "gobj_results", json_integer((json_int_t)(size_t)priv->gobj_postgres),
         "input_data", kw,
         "jobs",
             "exec_action", "action_create_table_if_not_exists",
