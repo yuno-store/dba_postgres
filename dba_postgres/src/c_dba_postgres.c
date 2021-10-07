@@ -930,19 +930,41 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
 PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
+    int last_job = kw_get_int(kw, "last_job", 0, KW_REQUIRED);
     const char *comment = kw_get_str(kw, "comment", "", 0);
 
-    if(result < 0) {
-        log_error(0,
-            "gobj",         "%s", gobj_full_name(gobj),
-            "function",     "%s", __FUNCTION__,
-            "msgset",       "%s", MSGSET_APP_ERROR,
-            "msg",          "%s", "Task End with error",
-            "comment",      "%s", comment,
-            "src",          "%s", gobj_full_name(src),
-            NULL
-        );
-        log_debug_json(0, kw, "Task End with error");
+    switch(result) {
+        case -1:
+            // Error from some task action
+            log_error(0,
+                "gobj",         "%s", gobj_full_name(gobj),
+                "function",     "%s", __FUNCTION__,
+                "msgset",       "%s", MSGSET_APP_ERROR,
+                "msg",          "%s", "Task End with error",
+                "comment",      "%s", comment,
+                "last_job",     "%d", last_job,
+                "src",          "%s", gobj_full_name(src),
+                NULL
+            );
+            log_debug_json(0, kw, "Task End with error");
+            break;
+        case -2:
+            // Error from task manager: timeout, incomplete task
+            log_error(0,
+                "gobj",         "%s", gobj_full_name(gobj),
+                "function",     "%s", __FUNCTION__,
+                "msgset",       "%s", MSGSET_APP_ERROR,
+                "msg",          "%s", "Task End by timeout",
+                "comment",      "%s", comment,
+                "last_job",     "%d", last_job,
+                "src",          "%s", gobj_full_name(src),
+                NULL
+            );
+            log_debug_json(0, kw, "Task End by timeout");
+            break;
+        case 0:
+            // Task end ok
+            break;
     }
 
     KW_DECREF(kw);
