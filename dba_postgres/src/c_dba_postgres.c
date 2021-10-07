@@ -317,8 +317,11 @@ PRIVATE json_t *action_create_table_if_not_exists(
     json_t *input_data = gobj_read_json_attr(src, "input_data");
     json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
+    char id[NAME_MAX];
+    snprintf(id, sizeof(id), "%s", gobj_name(src));
+
     json_t *query = json_pack("{s:s, s:s, s:o}",
-        "id", "????", // TODO
+        "id", id,
         "dst", gobj_name(src),
         "query",
         record2createtable(
@@ -375,8 +378,11 @@ PRIVATE json_t *action_add_row(
     json_t *input_data = gobj_read_json_attr(src, "input_data");
     json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
+    char id[NAME_MAX];
+    snprintf(id, sizeof(id), "%s", gobj_name(src));
+
     json_t *query = json_pack("{s:s, s:s, s:o}",
-        "id", "????", // TODO
+        "id", id,
         "dst", gobj_name(src),
         "query",
         record2insertsql(
@@ -930,8 +936,15 @@ PRIVATE int ac_on_message(hgobj gobj, const char *event, json_t *kw, hgobj src)
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
+PRIVATE int ac_end_task(
+    hgobj gobj,
+    const char *event,
+    json_t *kw,
+    hgobj src // Source is the GCLASS_TASK
+)
 {
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
     int last_job = kw_get_int(kw, "last_job", 0, KW_REQUIRED);
     const char *comment = kw_get_str(kw, "comment", "", 0);
@@ -964,6 +977,11 @@ PRIVATE int ac_end_task(hgobj gobj, const char *event, json_t *kw, hgobj src)
                 NULL
             );
             log_debug_json(0, kw, "Task End by timeout");
+
+            json_t *kw_clear = json_object();
+            json_object_set_new(kw_clear, "id", json_string(gobj_name(src)));
+            gobj_send_event(priv->gobj_postgres, "EV_CLEAR_QUEUE", kw_clear, gobj);
+
             break;
         case 0:
             // Task end ok
