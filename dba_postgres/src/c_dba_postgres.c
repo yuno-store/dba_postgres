@@ -317,7 +317,8 @@ PRIVATE json_t *action_create_table_if_not_exists(
     json_t *input_data = gobj_read_json_attr(src, "input_data");
     json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
-    json_t *query = json_pack("{s:s, s:o}",
+    json_t *query = json_pack("{s:s, s:s, s:o}",
+        "id", "????", // TODO
         "dst", gobj_name(src),
         "query",
         record2createtable(
@@ -374,7 +375,8 @@ PRIVATE json_t *action_add_row(
     json_t *input_data = gobj_read_json_attr(src, "input_data");
     json_t *schema_ = kw_get_dict(input_data, "_dba_postgres`schema", 0, KW_REQUIRED);
 
-    json_t *query = json_pack("{s:s, s:o}",
+    json_t *query = json_pack("{s:s, s:s, s:o}",
+        "id", "????", // TODO
         "dst", gobj_name(src),
         "query",
         record2insertsql(
@@ -447,7 +449,8 @@ PRIVATE json_t *result_add_row(
 // {
 //     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 //
-//     json_t *query = json_pack("{s:I, s:o}",
+//     json_t *query = json_pack("{s:s, s:s, s:o}",
+//         "id", ???
 //         "dst", gobj_name(src),
 //         "query", "SELECT * from tracks_geodb2;"
 //     );
