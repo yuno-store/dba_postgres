@@ -795,8 +795,8 @@ PRIVATE int process_msg(
      *-----------------------------*/
     json_t *kw_task = json_pack(
         "{s:o, s:o, s:O, s:["
-            "{s:s, s:s},"
-            "{s:s, s:s}"
+            "{s:s, s:s, s:i},"
+            "{s:s, s:s, s:i}"
             "]}",
         "gobj_jobs", json_integer((json_int_t)(size_t)gobj),
         "gobj_results", json_integer((json_int_t)(size_t)priv->gobj_postgres),
@@ -804,8 +804,10 @@ PRIVATE int process_msg(
         "jobs",
             "exec_action", "action_create_table_if_not_exists",
             "exec_result", "result_create_table_if_not_exists",
+            "exec_timeout", 20*1000,
             "exec_action", "action_add_row",
-            "exec_result", "result_add_row"
+            "exec_result", "result_add_row",
+            "exec_timeout", 20*1000
     );
 
     hgobj gobj_task = gobj_create_unique(task_name, GCLASS_TASK, kw_task, gobj);
