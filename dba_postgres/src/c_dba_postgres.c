@@ -427,6 +427,10 @@ PRIVATE json_t *result_add_row(
             char temp[512];
             const char *comment = kw_get_str(kw, "comment", "", 0);
             snprintf(temp, sizeof(temp), "Postgres: cannot add row -> %s", comment);
+            char *p = strchr(temp, '\n');
+            if(p) {
+                *p = 0;
+            }
             left_justify(temp);
             log_error(0,
                 "gobj",         "%s", gobj_full_name(gobj),
