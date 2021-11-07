@@ -439,7 +439,7 @@ PRIVATE json_t *result_add_row(
                 "msg",          "%s", temp,
                 NULL
             );
-            log_debug_json(0, kw, temp);
+            log_debug_json(0, kw, "%s", temp);
         }
     }
 
