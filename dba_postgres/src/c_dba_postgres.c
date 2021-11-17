@@ -409,6 +409,7 @@ PRIVATE json_t *result_add_row(
 {
     int result = kw_get_int(kw, "result", -1, KW_REQUIRED);
     if(result == 0 || 1) { // Send ack always
+        // TODO quito el send ack always? y compruebo tipo de error?
         json_t *input_data = gobj_read_json_attr(src, "input_data");
         json_t *__temp__ = kw_get_dict_value(input_data, "__temp__", 0, KW_REQUIRED|KW_EXTRACT);
 
