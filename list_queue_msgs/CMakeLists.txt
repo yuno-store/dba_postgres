@@ -63,6 +63,7 @@ TARGET_LINK_LIBRARIES(list_queue_msgs
     lzma        # used by libunwind
     uuid
     m
+    util
 )
 
 ##############################################

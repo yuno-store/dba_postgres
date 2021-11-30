@@ -80,7 +80,7 @@ TARGET_LINK_LIBRARIES(dba_postgres
     lzma        # used by libunwind
     uuid
     z rt m
-    uuid
+    util
 )
 
 ##############################################
