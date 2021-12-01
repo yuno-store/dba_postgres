@@ -67,7 +67,7 @@ SDATA_END()
 PRIVATE sdata_desc_t tattr_desc[] = {
 /*-ATTR-type------------name------------flag--------------------default-----description--*/
 SDATA (ASN_OCTET_STR,   "__username__", SDF_RD,                 "",         "Username"),
-SDATA (ASN_OCTET_STR,   "filename_mask",SDF_RD|SDF_REQUIRED,    "%Y-%m",        "System organization of tables (file name format, see strftime())"),
+SDATA (ASN_OCTET_STR,   "filename_mask",SDF_RD|SDF_REQUIRED,    "%Y-%m",    "System organization of tables (file name format, see strftime())"),
 SDATA (ASN_BOOLEAN,     "master",       SDF_RD,                 TRUE,       "the master is the only that can write"),
 SDATA (ASN_INTEGER,     "xpermission",  SDF_RD,                 02770,      "Use in creation, default 02770"),
 SDATA (ASN_INTEGER,     "rpermission",  SDF_RD,                 0660,       "Use in creation, default 0660"),
