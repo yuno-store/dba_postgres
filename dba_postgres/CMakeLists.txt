@@ -1,8 +1,8 @@
 ##############################################
 #   CMake
 ##############################################
-project(dba_postgres C)
 cmake_minimum_required(VERSION 3.0)
+project(dba_postgres C)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
 
