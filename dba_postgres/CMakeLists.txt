@@ -65,7 +65,7 @@ TARGET_LINK_LIBRARIES(dba_postgres
     /yuneta/development/output/lib/libssl.a
     /yuneta/development/output/lib/libcrypto.a
 
-    pq          # postgres
+    pq          # postgres, WARNING this library use openssl of distribution
 
     pthread dl  # used by libuv
     lzma        # used by libunwind
